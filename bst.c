@@ -1,170 +1,224 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/*TODO: caso em que se delete a raiz da arvore binaria
-        interface melhorada(do exato mesmo jeito e ordem que ta no classroom)
-        interface de switch case na parte de printar os valores
-        verificar se o uso do malloc ta certo e dar um free() no final pra liberar memoria
-        polir o codigo (talvez)
+/* ---------------------------------------------------------------------
+ * Arvore de Busca Binaria (BST) para armazenar numeros inteiros.
+ * Implementa insercao, busca, remocao (folha / um filho / dois filhos)
+ * e os tres percursos classicos (pre-ordem, em ordem e pos-ordem).
+ *
+ * Valores repetidos: se o valor inserido ja existir na arvore, insec()
+ * apenas avisa o usuario e nao cria um novo no (duplicados sao ignorados).
+ * --------------------------------------------------------------------- */
 
-*/
-
-typedef struct No{
+typedef struct No {
     int valor;
-    struct No *esquerda , *direita;
+    struct No *esquerda, *direita;
+} Arvore;
 
-}Arvore; //cria a arvore
-
-void insec(Arvore **raiz, int n){
-    if(*raiz == NULL){
+/* Insere um novo valor na arvore respeitando a propriedade da BST.
+ * Se *raiz for NULL, cria o no ali. Caso contrario, desce recursivamente
+ * para a esquerda (valores menores) ou direita (valores maiores) ate
+ * achar uma posicao livre. Valores iguais a um no ja existente sao
+ * ignorados, ou seja, a arvore nunca guarda duplicados. */
+void insec(Arvore **raiz, int n) {
+    if (*raiz == NULL) {
         *raiz = malloc(sizeof(Arvore));
+        if (*raiz == NULL) {
+            printf("erro: memoria insuficiente\n");
+            return;
+        }
         (*raiz)->valor = n;
         (*raiz)->esquerda = NULL;
         (*raiz)->direita = NULL;
-    }else{
-        if(n < (*raiz)->valor){
-            insec(&((*raiz)->esquerda), n);
-        }else if(n > (*raiz)->valor){
-            insec(&((*raiz)->direita), n);
-        }else{
-            printf("esse valor ja esta na arvore");
-        }
+    } else if (n < (*raiz)->valor) {
+        insec(&((*raiz)->esquerda), n);
+    } else if (n > (*raiz)->valor) {
+        insec(&((*raiz)->direita), n);
+    } else {
+        printf("esse valor ja esta na arvore\n");
     }
-} /*insere um elemento na arvore;verifica se a raiz não tem valor, se nao tiver, ele insere o valor e define os ponteiros filhos como NULL.
-Se a raiz ja tiver um valor, ao tentar inserir um novo valor, a funcao verifica se o novo valor é maior ou menor que a raiz, caso for menor,
-o ponteiro esquerda aponta ao novo valor, se for maior, o ponteiro direita aponta para o novo valor, se for igual, nao insere o valor.
-*/
-Arvore* remover(Arvore *raiz, int n){
-    if(raiz == NULL){ //verifica se o valor existe
-        printf("valor nao encontrado");
-        return NULL;
-    }else{
-        if(raiz->valor == n){ //no caso de ser uma folha, apenas libera a memoria da raiz
-            if(raiz->esquerda == NULL && raiz->direita == NULL){
-                free(raiz);
-                printf("o valor %d foi removido", n);
-                return NULL;
-            }else{
-                if(raiz->esquerda != NULL && raiz->direita != NULL){ //a gente vai fazer uma substituiçao com antecessor in-order aqui
-                    Arvore *substituto = raiz->esquerda; //cria um substituto que aponta ao valor a esquerda da raiz
-                    while(substituto->direita != NULL){
-                        substituto = substituto->direita; //percorre os valores a direita da subarvore a esquerda do valor que vai ser deletado
-                    }
-                    raiz->valor = substituto->valor; //faz uma troca de valores, a raiz recebe o valor substituto
-                    substituto->valor = n; //o substituto recebe o valor que a gente quer deletar
-                    raiz->esquerda = remover(raiz->esquerda, n); /*perceba que, ao fazer essas substituições, a raiz que a gente quer deletar
-                                                                   se torna uma raiz com 1 nó ou sem nós, podendo aplicar os modos de deletar raiz*/ 
-                    return raiz;
-
-                }else{ //caso tiver 1 nó, cria um ponteiro novo que aponta pro no da raiz que vai ser deletada, e depois retorna ela mesma (o nó vai para a raiz pai da raiz deletada)
-                    Arvore *substituto;
-                    if(raiz->esquerda != NULL){
-                        substituto = raiz->esquerda;
-                    }else{
-                        substituto = raiz->direita;
-                    }
-                    free(raiz);
-                    printf("o valor %d foi removido", n);
-                    return substituto;
-                }
-            }
-
-        }else{
-            if(n < raiz->valor){
-                raiz->esquerda = remover(raiz->esquerda, n);
-            }else{
-                raiz->direita = remover(raiz->direita, n);
-            }
-            return raiz;
-        }
-    }
-
 }
-void printar(Arvore *raiz){
-    if(raiz){
-        printf("%d ", raiz->valor);
-        printar(raiz->esquerda);
-        printar(raiz->direita);
-    }
-} /* printa o primeiro elemento da raiz, e depois chama a propria funcao pra printar os elementos da esquerda e direita da raiz até o final*/
 
-void printarOrdem(Arvore *raiz){
-    if(raiz){
-        printarOrdem(raiz->esquerda);
-        printf("%d ", raiz->valor);
-        printarOrdem(raiz->direita);
+/* Remove um valor da arvore e retorna a nova raiz da (sub)arvore.
+ * Cobre os tres casos classicos de remocao em BST:
+ *   1) no folha           -> so libera o no e retorna NULL
+ *   2) no com um filho    -> o filho assume o lugar do no removido
+ *   3) no com dois filhos -> troca o valor pelo antecessor in-order
+ *                             (o maior valor da subarvore esquerda) e
+ *                             remove o antecessor recursivamente
+ * Como a funcao sempre retorna a raiz atualizada e quem chama reatribui
+ * o ponteiro (ex.: raiz = remover(raiz, n)), remover a raiz da arvore
+ * inteira funciona normalmente, sem precisar de tratamento especial. */
+Arvore* remover(Arvore *raiz, int n) {
+    if (raiz == NULL) {
+        printf("valor nao encontrado\n");
+        return NULL;
     }
-} /* printa em ordem, printando primeiro os elementos a esquerda (menores), depois a raiz e por fim os elementos da direita.*/
 
-void printarPO(Arvore *raiz){
-    if(raiz){
-        printarPO(raiz->esquerda);
-        printarPO(raiz->direita);
-        printf("%d ", raiz->valor);
+    if (n < raiz->valor) {
+        raiz->esquerda = remover(raiz->esquerda, n);
+        return raiz;
     }
-} /*printa em pos ordem, printando na seguinte ordem:esquerda->direita->raiz*/
+    if (n > raiz->valor) {
+        raiz->direita = remover(raiz->direita, n);
+        return raiz;
+    }
 
-Arvore* busca(Arvore *raiz, int n){
-    while(raiz){
-        if(n < raiz->valor){
+    /* raiz->valor == n: achamos o no que precisa ser removido */
+    if (raiz->esquerda == NULL && raiz->direita == NULL) {
+        free(raiz);
+        printf("o valor %d foi removido\n", n);
+        return NULL;
+    }
+
+    if (raiz->esquerda != NULL && raiz->direita != NULL) {
+        Arvore *substituto = raiz->esquerda;
+        while (substituto->direita != NULL) {
+            substituto = substituto->direita; /* maior valor da subarvore esquerda */
+        }
+        raiz->valor = substituto->valor;      /* raiz recebe o valor do antecessor */
+        substituto->valor = n;                /* antecessor recebe o valor a remover */
+        raiz->esquerda = remover(raiz->esquerda, n); /* remove o antecessor, que agora
+                                                          tem no maximo um filho */
+        return raiz;
+    }
+
+    /* no com exatamente um filho: o filho assume o lugar da raiz removida */
+    Arvore *filho = (raiz->esquerda != NULL) ? raiz->esquerda : raiz->direita;
+    free(raiz);
+    printf("o valor %d foi removido\n", n);
+    return filho;
+}
+
+/* Busca um valor na arvore. Retorna o ponteiro para o no encontrado,
+ * ou NULL se o valor nao existir na arvore. */
+Arvore* busca(Arvore *raiz, int n) {
+    while (raiz) {
+        if (n < raiz->valor) {
             raiz = raiz->esquerda;
-        }else if(n > raiz->valor){
+        } else if (n > raiz->valor) {
             raiz = raiz->direita;
-        }else{
+        } else {
             return raiz;
         }
     }
     return NULL;
-}/* verifica se o valor exitse, se existir, ele compara o valor buscado com a raiz, se for maior, ele passa a procurar a partir da 
-direita, se for menor, a partir da esqurda.Retorna o valor quando encontrar ele.*/
+}
 
-int main (){
-    Arvore *raiz = NULL, *b;
-    int o, n;
-    do{
-        printf(" \n 1-inserir \n 2-remover \n 3-printar \n 4-buscar \n 0-sair");
-        scanf("%d", &o);
-        switch(o){
+/* Percurso pre-ordem: raiz -> esquerda -> direita */
+void printarPreOrdem(Arvore *raiz) {
+    if (raiz) {
+        printf("%d ", raiz->valor);
+        printarPreOrdem(raiz->esquerda);
+        printarPreOrdem(raiz->direita);
+    }
+}
+
+/* Percurso em ordem: esquerda -> raiz -> direita (imprime em ordem crescente) */
+void printarEmOrdem(Arvore *raiz) {
+    if (raiz) {
+        printarEmOrdem(raiz->esquerda);
+        printf("%d ", raiz->valor);
+        printarEmOrdem(raiz->direita);
+    }
+}
+
+/* Percurso pos-ordem: esquerda -> direita -> raiz */
+void printarPosOrdem(Arvore *raiz) {
+    if (raiz) {
+        printarPosOrdem(raiz->esquerda);
+        printarPosOrdem(raiz->direita);
+        printf("%d ", raiz->valor);
+    }
+}
+
+/* Libera toda a memoria alocada pela arvore (percurso pos-ordem: os dois
+ * filhos sao liberados antes do proprio no) e zera o ponteiro da raiz. */
+void liberarArvore(Arvore **raiz) {
+    if (*raiz == NULL) {
+        return;
+    }
+    liberarArvore(&((*raiz)->esquerda));
+    liberarArvore(&((*raiz)->direita));
+    free(*raiz);
+    *raiz = NULL;
+}
+
+int main(void) {
+    Arvore *raiz = NULL, *encontrado;
+    int opcao, subOpcao, n;
+
+    do {
+        printf("\n1 - Inserir valor\n");
+        printf("2 - Buscar valor\n");
+        printf("3 - Remover valor\n");
+        printf("4 - Percorrer arvore\n");
+        printf("0 - Sair\n");
+        printf("escolha uma opcao: ");
+        scanf("%d", &opcao);
+
+        switch (opcao) {
 
             case 1:
-            printf("indique o valor que voce deseja inserir:\n");
-            scanf("%d", &n);
-            insec(&raiz, n);
-            break;
+                printf("digite o valor que deseja inserir: ");
+                scanf("%d", &n);
+                insec(&raiz, n);
+                break;
 
             case 2:
-            printf("indique o valor que voce deseja remover:\n");
-            scanf("%d", &n);
-            raiz = remover(raiz, n);
-            break;
+                printf("digite o valor que deseja buscar: ");
+                scanf("%d", &n);
+                encontrado = busca(raiz, n);
+                if (encontrado) {
+                    printf("o valor %d foi encontrado na arvore\n", encontrado->valor);
+                } else {
+                    printf("o valor %d nao foi encontrado na arvore\n", n);
+                }
+                break;
 
             case 3:
-            printf("Pre-Ordem:\n");
-            printar(raiz);
-            printf("\n\n");
-            printf("Ordem:\n");
-            printarOrdem(raiz);
-            printf("\n\n");
-            printf("Pos-Ordem:\n");
-            printarPO(raiz);
+                printf("digite o valor que deseja remover: ");
+                scanf("%d", &n);
+                raiz = remover(raiz, n);
+                break;
 
-            break;
             case 4:
-            printf("qual valor voce deseja procurar?\n");
-            scanf("%d", &n);
-            b = busca(raiz, n);
-            if(b){
-                printf("\n o valor %d foi encontrado! \n", b->valor);
-            } else{
-                printf("valor nao encontrado");
-            }
-            break;
+                printf("\n1 - Pre-ordem\n");
+                printf("2 - Em ordem\n");
+                printf("3 - Pos-ordem\n");
+                printf("escolha uma opcao: ");
+                scanf("%d", &subOpcao);
+
+                switch (subOpcao) {
+                    case 1:
+                        printf("Pre-Ordem: ");
+                        printarPreOrdem(raiz);
+                        printf("\n");
+                        break;
+                    case 2:
+                        printf("Em Ordem: ");
+                        printarEmOrdem(raiz);
+                        printf("\n");
+                        break;
+                    case 3:
+                        printf("Pos-Ordem: ");
+                        printarPosOrdem(raiz);
+                        printf("\n");
+                        break;
+                    default:
+                        printf("opcao invalida\n");
+                }
+                break;
+
+            case 0:
+                liberarArvore(&raiz);
+                printf("memoria liberada, encerrando...\n");
+                break;
+
             default:
-            if(o != 0){
-                printf("valor invalido \n");
-            }
+                printf("opcao invalida\n");
         }
-    }while(o != 0);
+    } while (opcao != 0);
 
     return 0;
 }
