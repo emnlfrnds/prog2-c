@@ -2,9 +2,14 @@
 #include <stdlib.h>
 
 /* ---------------------------------------------------------------------
- * Arvore de Busca Binaria (BST) para armazenar numeros inteiros.
+ * Arvore AVL (BST auto-balanceada) para armazenar numeros inteiros.
  * Implementa insercao, busca, remocao (folha / um filho / dois filhos)
  * e os tres percursos classicos (pre-ordem, em ordem e pos-ordem).
+ *
+ * Alem da propriedade da BST, a AVL garante que, para todo no, a
+ * diferenca de altura entre as subarvores esquerda e direita (fator de
+ * balanceamento) seja -1, 0 ou +1. Quando uma insercao ou remocao quebra
+ * essa regra, a arvore e rebalanceada com rotacoes simples ou duplas.
  *
  * Valores repetidos: se o valor inserido ja existir na arvore, insec()
  * apenas avisa o usuario e nao cria um novo no (duplicados sao ignorados).
@@ -12,14 +17,107 @@
 
 typedef struct No {
     int valor;
+    int altura; /* altura do no, contada em nos (NULL = 0, folha = 1) */
     struct No *esquerda, *direita;
 } Arvore;
+
+/* ------------------------- funcoes auxiliares AVL ------------------------- */
+
+/* Retorna a altura de um no. Arvore vazia (NULL) tem altura 0. */
+int altura(Arvore *no) {
+    return no ? no->altura : 0;
+}
+
+int maior(int a, int b) {
+    return (a > b) ? a : b;
+}
+
+/* Recalcula a altura do no a partir da altura dos filhos. */
+void atualizarAltura(Arvore *no) {
+    no->altura = 1 + maior(altura(no->esquerda), altura(no->direita));
+}
+
+/* Fator de balanceamento = altura(esquerda) - altura(direita).
+ * Positivo: pesada a esquerda. Negativo: pesada a direita.
+ * Em uma AVL valida, o valor fica sempre entre -1 e +1. */
+int fatorBalanceamento(Arvore *no) {
+    return no ? altura(no->esquerda) - altura(no->direita) : 0;
+}
+
+/* Rotacao simples a direita (caso Esquerda-Esquerda):
+ *        y                x
+ *       / \              / \
+ *      x   C    ==>     A   y
+ *     / \                  / \
+ *    A   B                B   C
+ * Retorna a nova raiz da subarvore (x). */
+Arvore* rotacaoDireita(Arvore *y) {
+    Arvore *x = y->esquerda;
+    Arvore *b = x->direita;
+
+    x->direita = y;
+    y->esquerda = b;
+
+    /* y agora e filho de x, entao a altura de y deve ser atualizada primeiro */
+    atualizarAltura(y);
+    atualizarAltura(x);
+    return x;
+}
+
+/* Rotacao simples a esquerda (caso Direita-Direita): espelho da anterior.
+ * Retorna a nova raiz da subarvore (y). */
+Arvore* rotacaoEsquerda(Arvore *x) {
+    Arvore *y = x->direita;
+    Arvore *b = y->esquerda;
+
+    y->esquerda = x;
+    x->direita = b;
+
+    atualizarAltura(x);
+    atualizarAltura(y);
+    return y;
+}
+
+/* Atualiza a altura do no e, se ele estiver desbalanceado, aplica a
+ * rotacao adequada. Retorna a raiz (possivelmente nova) da subarvore.
+ *   fb >  1 e filho esquerdo pesado a esquerda ou equilibrado -> rotacao direita          (LL)
+ *   fb >  1 e filho esquerdo pesado a direita                 -> rotacao esq. + direita   (LR)
+ *   fb < -1 e filho direito pesado a direita ou equilibrado   -> rotacao esquerda         (RR)
+ *   fb < -1 e filho direito pesado a esquerda                 -> rotacao dir. + esquerda  (RL)
+ * O caso "filho equilibrado (fb == 0)" so ocorre na remocao e tambem
+ * e resolvido com rotacao simples. */
+Arvore* balancear(Arvore *no) {
+    int fb;
+
+    atualizarAltura(no);
+    fb = fatorBalanceamento(no);
+
+    if (fb > 1) {
+        if (fatorBalanceamento(no->esquerda) < 0) {
+            no->esquerda = rotacaoEsquerda(no->esquerda); /* caso LR */
+        }
+        return rotacaoDireita(no);
+    }
+
+    if (fb < -1) {
+        if (fatorBalanceamento(no->direita) > 0) {
+            no->direita = rotacaoDireita(no->direita);    /* caso RL */
+        }
+        return rotacaoEsquerda(no);
+    }
+
+    return no; /* ja estava balanceado */
+}
+
+/* ------------------------------ operacoes ------------------------------ */
 
 /* Insere um novo valor na arvore respeitando a propriedade da BST.
  * Se *raiz for NULL, cria o no ali. Caso contrario, desce recursivamente
  * para a esquerda (valores menores) ou direita (valores maiores) ate
  * achar uma posicao livre. Valores iguais a um no ja existente sao
- * ignorados, ou seja, a arvore nunca guarda duplicados. */
+ * ignorados, ou seja, a arvore nunca guarda duplicados.
+ * Na volta da recursao, cada no do caminho tem a altura atualizada e e
+ * rebalanceado se necessario. */
 void insec(Arvore **raiz, int n) {
     if (*raiz == NULL) {
         *raiz = malloc(sizeof(Arvore));
@@ -28,15 +126,22 @@ void insec(Arvore **raiz, int n) {
             return;
         }
         (*raiz)->valor = n;
+        (*raiz)->altura = 1; /* no novo e sempre folha */
         (*raiz)->esquerda = NULL;
         (*raiz)->direita = NULL;
-    } else if (n < (*raiz)->valor) {
+        return;
+    }
+
+    if (n < (*raiz)->valor) {
         insec(&((*raiz)->esquerda), n);
     } else if (n > (*raiz)->valor) {
         insec(&((*raiz)->direita), n);
     } else {
         printf("esse valor ja esta na arvore\n");
+        return; /* duplicado: nada mudou, nao precisa rebalancear */
     }
+
+    *raiz = balancear(*raiz);
 }
 
 /* Remove um valor da arvore e retorna a nova raiz da (sub)arvore.
@@ -48,7 +153,10 @@ void insec(Arvore **raiz, int n) {
  *                             remove o antecessor recursivamente
  * Como a funcao sempre retorna a raiz atualizada e quem chama reatribui
  * o ponteiro (ex.: raiz = remover(raiz, n)), remover a raiz da arvore
- * inteira funciona normalmente, sem precisar de tratamento especial. */
+ * inteira funciona normalmente, sem precisar de tratamento especial.
+ * Em todos os caminhos que mantem o no vivo, o retorno passa por
+ * balancear(), pois a remocao pode reduzir a altura de uma subarvore
+ * e desbalancear qualquer ancestral (nao so o pai). */
 Arvore* remover(Arvore *raiz, int n) {
     if (raiz == NULL) {
         printf("valor nao encontrado\n");
@@ -57,11 +165,11 @@ Arvore* remover(Arvore *raiz, int n) {
 
     if (n < raiz->valor) {
         raiz->esquerda = remover(raiz->esquerda, n);
-        return raiz;
+        return balancear(raiz);
     }
     if (n > raiz->valor) {
         raiz->direita = remover(raiz->direita, n);
-        return raiz;
+        return balancear(raiz);
     }
 
     /* raiz->valor == n: achamos o no que precisa ser removido */
@@ -80,10 +188,11 @@ Arvore* remover(Arvore *raiz, int n) {
         substituto->valor = n;                /* antecessor recebe o valor a remover */
         raiz->esquerda = remover(raiz->esquerda, n); /* remove o antecessor, que agora
                                                           tem no maximo um filho */
-        return raiz;
+        return balancear(raiz);
     }
 
-    /* no com exatamente um filho: o filho assume o lugar da raiz removida */
+    /* no com exatamente um filho: o filho assume o lugar da raiz removida.
+     * O filho ja e uma subarvore AVL valida, entao nao precisa de ajuste. */
     Arvore *filho = (raiz->esquerda != NULL) ? raiz->esquerda : raiz->direita;
     free(raiz);
     printf("o valor %d foi removido\n", n);
