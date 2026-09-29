@@ -3,8 +3,9 @@
 
 /* ---------------------------------------------------------------------
  * Arvore AVL (BST auto-balanceada) para armazenar numeros inteiros.
- * Implementa insercao, busca, remocao (folha / um filho / dois filhos)
- * e os tres percursos classicos (pre-ordem, em ordem e pos-ordem).
+ * Implementa insercao, busca, remocao (folha / um filho / dois filhos),
+ * os tres percursos classicos (pre-ordem, em ordem e pos-ordem) e a
+ * visualizacao do balanceamento da arvore.
  *
  * Alem da propriedade da BST, a AVL garante que, para todo no, a
  * diferenca de altura entre as subarvores esquerda e direita (fator de
@@ -241,6 +242,50 @@ void printarPosOrdem(Arvore *raiz) {
     }
 }
 
+/* ------------------------ visualizacao do balanceamento ------------------------ */
+
+/* Desenha a arvore "deitada" (raiz a esquerda), mostrando para cada no o
+ * fator de balanceamento (fb) e a altura (h). A subarvore direita aparece
+ * em cima e a esquerda embaixo, entao basta girar a cabeca 90 graus para
+ * a esquerda para ver a arvore na posicao normal.
+ * Um no com |fb| > 1 e marcado com "<-- DESBALANCEADO" (na AVL isso
+ * nunca deveria acontecer, mas serve como verificacao). */
+void mostrarBalanceamento(Arvore *raiz, int nivel) {
+    int i, fb;
+
+    if (raiz == NULL) {
+        return;
+    }
+
+    mostrarBalanceamento(raiz->direita, nivel + 1);
+
+    for (i = 0; i < nivel; i++) {
+        printf("        ");
+    }
+    fb = fatorBalanceamento(raiz);
+    printf("%d (fb=%+d, h=%d)", raiz->valor, fb, raiz->altura);
+    if (fb > 1 || fb < -1) {
+        printf("  <-- DESBALANCEADO");
+    }
+    printf("\n");
+
+    mostrarBalanceamento(raiz->esquerda, nivel + 1);
+}
+
+/* Retorna 1 se todos os nos da arvore tem |fb| <= 1, e 0 caso contrario. */
+int estaBalanceada(Arvore *raiz) {
+    int fb;
+
+    if (raiz == NULL) {
+        return 1;
+    }
+    fb = fatorBalanceamento(raiz);
+    if (fb > 1 || fb < -1) {
+        return 0;
+    }
+    return estaBalanceada(raiz->esquerda) && estaBalanceada(raiz->direita);
+}
+
 /* Libera toda a memoria alocada pela arvore (percurso pos-ordem: os dois
  * filhos sao liberados antes do proprio no) e zera o ponteiro da raiz. */
 void liberarArvore(Arvore **raiz) {
@@ -262,6 +307,7 @@ int main(void) {
         printf("2 - Buscar valor\n");
         printf("3 - Remover valor\n");
         printf("4 - Percorrer arvore\n");
+        printf("5 - Ver balanceamento da arvore\n");
         printf("0 - Sair\n");
         printf("escolha uma opcao: ");
         scanf("%d", &opcao);
@@ -316,6 +362,18 @@ int main(void) {
                         break;
                     default:
                         printf("opcao invalida\n");
+                }
+                break;
+
+            case 5:
+                if (raiz == NULL) {
+                    printf("a arvore esta vazia\n");
+                } else {
+                    printf("\nArvore (raiz a esquerda, direita em cima):\n\n");
+                    mostrarBalanceamento(raiz, 0);
+                    printf("\naltura da arvore: %d\n", altura(raiz));
+                    printf("fator de balanceamento da raiz: %+d\n", fatorBalanceamento(raiz));
+                    printf("arvore balanceada: %s\n", estaBalanceada(raiz) ? "sim" : "nao");
                 }
                 break;
 
