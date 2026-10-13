@@ -13,13 +13,16 @@ typedef struct No {
     Cor cor;
     struct No *esq;   /* filho da esquerda */
     struct No *dir;   /* filho da direita  */
-    struct No *pai;   /* pai do no         */
+    struct No *pai;   /* pai: necessario para achar o tio e o avo na correcao */
 } No;
 
 No *raiz = NULL;      /* comeca com arvore vazia */
 
 /* ------------------------------------------------------------
  * Cria um no novo. Todo no novo nasce VERMELHO.
+ * Por que vermelho? Nao altera a altura negra (regra 5),
+ * entao so pode violar a regra 4 (vermelho com filho vermelho),
+ * que e mais facil de consertar.
  * ------------------------------------------------------------ */
 No *criar_no(int valor) {
     No *n = (No *)malloc(sizeof(No));
@@ -35,16 +38,20 @@ No *criar_no(int valor) {
     return n;
 }
 
+/* ------------------------------------------------------------
+ * ROTACOES: mudam a forma da arvore mas MANTEM a ordem da ABP.
+ * Em cada uma, so ~3 ligacoes mudam: custo O(1).
+ * ------------------------------------------------------------ */
 void rotacao_esquerda(No *x) {
     No *y = x->dir;
 
-    x->dir = y->esq;              /* B passa a ser filho direito de x */
+    x->dir = y->esq;              /* subarvore B de y passa a ser filho direito de x */
     if (y->esq != NULL)
         y->esq->pai = x;
 
     y->pai = x->pai;              /* y assume o lugar de x */
     if (x->pai == NULL)
-        raiz = y;
+        raiz = y;                 /* x era a raiz: atualiza a raiz global */
     else if (x == x->pai->esq)
         x->pai->esq = y;
     else
@@ -54,7 +61,7 @@ void rotacao_esquerda(No *x) {
     x->pai = y;
 }
 
-void rotacao_direita(No *x) {
+void rotacao_direita(No *x) {     /* espelho da rotacao esquerda */
     No *y = x->esq;
 
     x->esq = y->dir;
@@ -74,6 +81,9 @@ void rotacao_direita(No *x) {
 }
 
 /* ------------------------------------------------------------
+ * CORRIGIR: restaura as regras depois da insercao.
+ * Roda enquanto o pai de n for VERMELHO (violacao da regra 4).
+ *
  *   Caso 1 - tio VERMELHO: RECOLORACAO
  *            pai e tio viram PRETOS, avo vira VERMELHO.
  *            Depois repetimos a verificacao a partir do avo.
@@ -83,15 +93,19 @@ void rotacao_direita(No *x) {
  *
  *   Caso 3 - tio PRETO (ou NULL) e n esta "esticado":
  *            pai vira PRETO, avo vira VERMELHO, rotacao no avo.
+ *
+ * Total de rotacoes por insercao: no maximo 2 (casos 2 e 3).
+ * A recoloracao e que pode subir ate a raiz.
  * ------------------------------------------------------------ */
 void corrigir(No *n) {
     while (n != raiz && n->pai->cor == VERMELHO) {
         No *pai = n->pai;
-        No *avo = pai->pai;   /* pai e vermelho, entao nao e a raiz: avo existe */
+        /* pai e vermelho, e a raiz e preta, entao pai nao e a raiz: avo existe */
+        No *avo = pai->pai;
 
         if (pai == avo->esq) {
             /* ---- pai e filho ESQUERDO do avo ---- */
-            No *tio = avo->dir;
+            No *tio = avo->dir;   /* NULL conta como preto */
 
             if (tio != NULL && tio->cor == VERMELHO) {
                 /* Caso 1: recoloracao */
@@ -107,7 +121,7 @@ void corrigir(No *n) {
                     printf("  -> Rotacao esquerda em %d\n", pai->valor);
                     n = pai;
                     rotacao_esquerda(n);
-                    pai = n->pai;
+                    pai = n->pai;     /* apos a rotacao, o pai mudou */
                 }
                 /* Caso 3: n esta "esticado" -> recolore e rotacao direita no avo */
                 printf("  -> Recoloracao: %d vira PRETO e %d vira VERMELHO\n",
@@ -116,6 +130,7 @@ void corrigir(No *n) {
                 pai->cor = PRETO;
                 avo->cor = VERMELHO;
                 rotacao_direita(avo);
+                /* o laco termina: o novo pai (PRETO) encerra a violacao */
             }
         } else {
             /* ---- pai e filho DIREITO do avo (tudo espelhado) ---- */
@@ -148,7 +163,7 @@ void corrigir(No *n) {
         }
     }
 
-    /* Regra 2: a raiz sempre e PRETA */
+    /* Regra 2: a raiz sempre e PRETA (a recoloracao pode ter pintado de vermelho) */
     if (raiz->cor == VERMELHO) {
         printf("  -> Raiz (%d) volta a ser PRETA\n", raiz->valor);
         raiz->cor = PRETO;
@@ -192,8 +207,8 @@ int inserir(int valor) {
 
 /* ------------------------------------------------------------
  * MOSTRAR: desenha a arvore "deitada" (de lado).
- * A raiz fica na esquerda; filhos DIREITOS aparecem em cima
- * e filhos ESQUERDOS embaixo.
+ * Percurso em ordem invertida (direita, no, esquerda):
+ * a raiz fica na esquerda; filhos DIREITOS em cima e ESQUERDOS embaixo.
  * ------------------------------------------------------------ */
 void mostrar(No *n, int nivel) {
     if (n == NULL)
@@ -212,7 +227,7 @@ void mostrar(No *n, int nivel) {
     mostrar(n->esq, nivel + 1);       /* depois o lado esquerdo (fica embaixo) */
 }
 
-/* Libera toda a memoria da arvore (usado ao sair) */
+/* Libera toda a memoria da arvore (pos-ordem: filhos antes do pai) */
 void liberar(No *n) {
     if (n == NULL)
         return;
@@ -221,14 +236,15 @@ void liberar(No *n) {
     free(n);
 }
 
-/* Le um numero inteiro do teclado; retorna 0 se a entrada for invalida */
+/* Le um inteiro do teclado e limpa o resto da linha.
+ * Retorna 1 se leu, 0 se a entrada foi invalida, -1 se acabou a entrada (EOF). */
 int ler_inteiro(int *numero) {
-    if (scanf("%d", numero) == 1)
-        return 1;
-    /* entrada invalida: descarta o que foi digitado */
+    int r = scanf("%d", numero);
+    if (r == EOF)
+        return -1;
     int c;
     while ((c = getchar()) != '\n' && c != EOF) { }
-    return 0;
+    return r == 1;
 }
 
 /* ------------------------------------------------------------
@@ -237,6 +253,7 @@ int ler_inteiro(int *numero) {
 int main(void) {
     int opcao = -1;
     int valor;
+    int r;
 
     while (opcao != 0) {
         printf("\n===== ARVORE RUBRO-NEGRA =====\n");
@@ -245,7 +262,10 @@ int main(void) {
         printf("0 - Sair\n");
         printf("Escolha: ");
 
-        if (!ler_inteiro(&opcao)) {
+        r = ler_inteiro(&opcao);
+        if (r < 0)
+            break;                    /* EOF: sai do laco e libera a memoria */
+        if (r == 0) {
             opcao = -1;
             printf("Opcao invalida!\n");
             continue;
@@ -253,17 +273,18 @@ int main(void) {
 
         if (opcao == 1) {
             printf("Numero a inserir: ");
-            if (!ler_inteiro(&valor)) {
+            r = ler_inteiro(&valor);
+            if (r < 0)
+                break;
+            if (r == 0) {
                 printf("Digite apenas numeros inteiros!\n");
                 continue;
             }
-            if (inserir(valor)) {
+            /* a arvore NAO e mostrada aqui; use a opcao 2 */
+            if (inserir(valor))
                 printf("%d inserido com sucesso!\n", valor);
-                printf("\nArvore atual:\n");
-                mostrar(raiz, 0);
-            } else {
+            else
                 printf("%d ja existe na arvore!\n", valor);
-            }
 
         } else if (opcao == 2) {
             if (raiz == NULL) {
