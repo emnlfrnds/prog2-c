@@ -1,20 +1,3 @@
-/*
- * ARVORE RUBRO-NEGRA (Red-Black Tree) - versao simples e comentada
- *
- * Regras da arvore:
- *   1. Todo no e VERMELHO ou PRETO.
- *   2. A raiz e sempre PRETA.
- *   3. Um no VERMELHO nunca tem filho VERMELHO.
- *   4. Todo caminho da raiz ate uma folha (NULL) tem a mesma
- *      quantidade de nos PRETOS.
- *
- * Todo no novo entra VERMELHO. Se isso quebrar alguma regra,
- * a funcao corrigir() arruma com RECOLORACAO e/ou ROTACAO.
- *
- * Compilar:  gcc arvore_rubro_negra.c -o arvore
- * Executar:  ./arvore
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -52,15 +35,6 @@ No *criar_no(int valor) {
     return n;
 }
 
-/* ------------------------------------------------------------
- * ROTACAO ESQUERDA em x:
- *
- *      x                 y
- *     / \               / \
- *    A   y     ==>     x   C
- *       / \           / \
- *      B   C         A   B
- * ------------------------------------------------------------ */
 void rotacao_esquerda(No *x) {
     No *y = x->dir;
 
@@ -80,15 +54,6 @@ void rotacao_esquerda(No *x) {
     x->pai = y;
 }
 
-/* ------------------------------------------------------------
- * ROTACAO DIREITA em x (espelho da rotacao esquerda):
- *
- *        x             y
- *       / \           / \
- *      y   C   ==>   A   x
- *     / \               / \
- *    A   B             B   C
- * ------------------------------------------------------------ */
 void rotacao_direita(No *x) {
     No *y = x->esq;
 
@@ -109,10 +74,6 @@ void rotacao_direita(No *x) {
 }
 
 /* ------------------------------------------------------------
- * CORRIGIR: conserta a arvore depois de inserir o no "n".
- * So existe problema quando o PAI de n tambem e VERMELHO
- * (dois vermelhos seguidos). Olhamos a cor do TIO:
- *
  *   Caso 1 - tio VERMELHO: RECOLORACAO
  *            pai e tio viram PRETOS, avo vira VERMELHO.
  *            Depois repetimos a verificacao a partir do avo.
