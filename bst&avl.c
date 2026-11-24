@@ -365,7 +365,7 @@ int main(void) {
                 }
                 break;
 
-            case 5:
+             case 5:
                 if (raiz == NULL) {
                     printf("a arvore esta vazia\n");
                 } else {
